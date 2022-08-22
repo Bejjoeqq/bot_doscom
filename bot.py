@@ -1,22 +1,23 @@
 from sql import select,insert_event,insert_state,update_present,insert_save,insert_admin
 from gmail import send_gmail
+from slugify import slugify
 import telebot,threading,datetime,time,random,re
 
 #config
 config = {
 	"local" : {
-		"grup_id" : int_testing_grup,
-		"token" : str_testing_token,
+		"grup_id" : 1234567890,
+		"token" : "token",
 		"time" : 0,
-		"db_credentials" : ["email","password"], #set credentials
+		"db_credentials" : ["email","password"],
 		"db_send_email" : "test_members",
 		"engine" : "local"
 	},
 	"deploy" : {
 		"grup_id" : -1001206779016, #grup doscom
-		"token" : str_token,
+		"token" : "token",
 		"time" : 7,
-		"db_credentials" : ["email","password"], #set credentials
+		"db_credentials" : ["email","password"],
 		"db_send_email" : "members",
 		"engine" : "deploy"
 	}
@@ -51,30 +52,31 @@ def delete(message):
 
 @bot.message_handler(commands=["save"])
 def save(message):
-	if message.chat.id == var_global["grup_id"] or message.chat.id == 948159175:
-		if message.text.lower().strip()!="/save":
-			msg = message.text.replace("/save","").strip()
-			url = re.search("(?P<url>https?://[^\s]+)", msg).group("url")
-			msg = msg.replace(url,"")
-			title = msg.split("\n")[0]
-			msg = msg.replace(title,"").strip()
+	bot.send_message(message.chat.id,"Fitur ini sudah di nonaktifkan")
+# 	if message.chat.id == var_global["grup_id"] or message.chat.id == 948159175:
+# 		if message.text.lower().strip()!="/save":
+# 			msg = message.text.replace("/save","").strip()
+# 			url = re.search("(?P<url>https?://[^\s]+)", msg).group("url")
+# 			msg = msg.replace(url,"")
+# 			title = msg.split("\n")[0]
+# 			msg = msg.replace(title,"").strip()
 
-			insert_save(title,msg,url)
+# 			insert_save(title,msg,url)
 
-			bot.send_message(message.chat.id,"Disimpan")
-		else:
-			teks = f"""# /save
-## judul
-## deskripsi dan url
+# 			bot.send_message(message.chat.id,"Disimpan")
+# 		else:
+# 			teks = f"""# /save
+# ## judul
+# ## deskripsi dan url
 
-# example
-/save 
-Link Google
-Halaman utama google bisa di
-buka melalui https://www.google.com/
-Terima kasih
-"""
-			bot.send_message(message.chat.id,teks,disable_web_page_preview=True)
+# # example
+# /save 
+# Link Google
+# Halaman utama google bisa di
+# buka melalui https://www.google.com/
+# Terima kasih
+# """
+# 			bot.send_message(message.chat.id,teks,disable_web_page_preview=True)
 
 @bot.message_handler(commands=["get"])
 def get(message):
@@ -162,12 +164,12 @@ def set(message):
 
 								if is_photo:
 									bot.send_photo(message.chat.id,photos)
-									pinned = bot.send_message(message.chat.id, getMessageEvent(judul,tanggal,desc,f"#{ids} - "), reply_markup=markup)
+									pinned = bot.send_message(message.chat.id, getMessageEvent(judul,tanggal,desc,f"#{ids} - "), reply_markup=markup, disable_web_page_preview=True)
 								else:
-									pinned = bot.send_message(message.chat.id, getMessageEvent(judul,tanggal,desc,f"#{ids} - "), reply_markup=markup)
+									pinned = bot.send_message(message.chat.id, getMessageEvent(judul,tanggal,desc,f"#{ids} - "), reply_markup=markup, disable_web_page_preview=True)
 
 								bot.pin_chat_message(message.chat.id,pinned.message_id)
-								send_gmail(judul,getMessageEvent(judul,tanggal,desc),var_global["db_credentials"],var_global["db_send_email"])
+								# send_gmail(judul,getMessageEvent(judul,tanggal,desc),var_global["db_credentials"],var_global["db_send_email"])
 
 						except Exception as e:
 							bot.send_message(message.chat.id,"Format salah, lihat contoh penggunaan /set.")
@@ -253,17 +255,30 @@ def getBulan(x):
 	return bulan[x]
 
 def getMessageEvent(judul,tanggal,description,ids=""):
+	pattern = r"(?P<url>https?://[^\s]+)"
+	link = re.search(pattern, description)
 	jam = tanggal.split(" ")[0]
 	tanggal = tanggal.split(" ")[1].split("/")
-	pesan = f"""{ids}{judul.title()}
+	if link == None:
+		pesan = f"""{ids}{judul.title()}
 
 Tanggal : {tanggal[0]} {getBulan(tanggal[1])} {tanggal[2]}
 Pukul     : {jam} WIB - Selesai
-Meet      : http://g.co/meet/{judul.lower().strip().replace(" ","-")}
+Link        : http://g.co/meet/{slugify(judul)}
 (Gunakan akun mahasiswa)
 
 {description}
 """
+	else:
+		pesan = f"""{ids}{judul.title()}
+
+Tanggal : {tanggal[0]} {getBulan(tanggal[1])} {tanggal[2]}
+Pukul     : {jam} WIB - Selesai
+Link        : {link.group("url")}
+
+{description.replace(link.group("url"),"")}
+"""
+
 	return pesan
 
 def list_word(x,y=""):
@@ -287,8 +302,11 @@ def timecheck():
 				if today.strftime("%d/%m")=="/".join(x[0].split("/")[:2]):
 					print("hbd")
 					bot.send_photo(var_global["grup_id"], x[3])
-					bot.send_message(var_global["grup_id"],list_word(x[1]))
-			time.sleep(5)
+					if x[1].lower() == "doscom":
+						bot.send_message(var_global["grup_id"],"Selamat ulang tahun DOSCOM!")
+					else:
+						bot.send_message(var_global["grup_id"],list_word(x[1]))
+			time.sleep(60)
 
 		if today.second==0:
 			result = select(q="select name,dates,description,photo from events")
@@ -300,10 +318,10 @@ def timecheck():
 					# print("masuk")
 					if x[3]!="-":
 						bot.send_photo(var_global["grup_id"], x[3])
-						bot.send_message(var_global["grup_id"], getMessageEvent(x[0],x[1],x[2]))
+						bot.send_message(var_global["grup_id"], getMessageEvent(x[0],x[1],x[2]), disable_web_page_preview=True)
 						bot.send_message(var_global["grup_id"], "30 Menit lagi, jangan lupa ya !")
 					else:
-						bot.send_message(var_global["grup_id"], getMessageEvent(x[0],x[1],x[2]))
+						bot.send_message(var_global["grup_id"], getMessageEvent(x[0],x[1],x[2]), disable_web_page_preview=True)
 						bot.send_message(var_global["grup_id"], "30 Menit lagi, jangan lupa ya !")
 
 		time.sleep(1)
